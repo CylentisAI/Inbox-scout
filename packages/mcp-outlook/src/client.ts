@@ -80,7 +80,10 @@ export class MCPOutlookClient {
     });
 
     if (!response.ok) {
-      throw new Error(`Graph API request failed: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error(`Graph API Error: ${response.status} ${response.statusText}`);
+      console.error(`Error details: ${errorText}`);
+      throw new Error(`Graph API request failed: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     return response.json();
@@ -88,6 +91,7 @@ export class MCPOutlookClient {
 
   async getUnreadMessages(): Promise<EmailMessage[]> {
     try {
+      // For application permissions, we need to use the user's object ID or use /me endpoint
       const result = await this.makeGraphRequest(
         `/users/${process.env.CLIENT_EMAIL || 'amy@alignedtribe.com'}/messages?$filter=isRead eq false&$select=id,subject,body,from,conversationId,webLink,receivedDateTime`
       );
