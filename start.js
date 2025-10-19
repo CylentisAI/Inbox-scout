@@ -22,6 +22,21 @@ const requiredEnvVars = [
   'AZURE_CLIENT_SECRET'
 ];
 
+// Check optional Pinecone env vars
+const optionalPineconeVars = [
+  'PINECONE_API_KEY',
+  'PINECONE_ENVIRONMENT',
+  'PINECONE_INDEX_NAME'
+];
+
+const missingPineconeVars = optionalPineconeVars.filter(varName => !process.env[varName]);
+if (missingPineconeVars.length > 0) {
+  console.warn('⚠️  Optional Pinecone variables not set:');
+  console.warn('   ', missingPineconeVars.join(', '));
+  console.warn('   Service will run without conversation memory and voice learning');
+  console.warn('');
+}
+
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingVars.length > 0) {

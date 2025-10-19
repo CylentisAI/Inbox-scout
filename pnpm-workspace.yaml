@@ -1,6 +1,7 @@
 ﻿packages:
   - 'packages/mcp-outlook'
   - 'packages/mcp-notion'
+  - 'packages/memory-pinecone'
   - 'packages/ingest-linkedin'
   - 'packages/agent-service'
   - 'services/*'

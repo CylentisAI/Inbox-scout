@@ -28,6 +28,7 @@
   "dependencies": {
     "@azure/msal-node": "^2.5.0",
     "@notionhq/client": "^2.2.0",
+    "@pinecone-database/pinecone": "^2.0.0",
     "openai": "^4.0.0",
     "diff-match-patch": "^1.0.5",
     "node-cron": "^3.0.3",

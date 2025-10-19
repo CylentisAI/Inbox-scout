@@ -4,6 +4,7 @@ import cron from 'node-cron';
 import OpenAI from 'openai';
 import { MCPOutlookClient } from '@inbox-scout/mcp-outlook';
 import { MCPNotionClient } from '@inbox-scout/mcp-notion';
+import { MemoryClient } from '@inbox-scout/memory-pinecone';
 
 interface EmailMessage {
   id: string;
@@ -31,6 +32,7 @@ class InboxScoutAgent {
   private openai: OpenAI;
   private outlookClient: MCPOutlookClient;
   private notionClient: MCPNotionClient;
+  private memoryClient: MemoryClient | null = null;
   private app: express.Application;
   private isProcessing: boolean = false;
 
@@ -77,6 +79,20 @@ class InboxScoutAgent {
         voicePack: process.env.NOTION_VOICE_PACK_DB_ID!
       }
     );
+
+    // Initialize memory client if Pinecone credentials are provided
+    if (process.env.PINECONE_API_KEY && process.env.PINECONE_ENVIRONMENT && process.env.PINECONE_INDEX_NAME) {
+      console.log('🧠 Initializing memory client with Pinecone...');
+      this.memoryClient = new MemoryClient(
+        process.env.PINECONE_API_KEY,
+        process.env.PINECONE_ENVIRONMENT,
+        process.env.PINECONE_INDEX_NAME,
+        process.env.OPENAI_API_KEY!
+      );
+      console.log('✅ Memory client initialized');
+    } else {
+      console.log('⚠️  Pinecone not configured - running without conversation memory');
+    }
 
     this.app = express();
     this.setupExpress();
@@ -175,11 +191,29 @@ class InboxScoutAgent {
         lastInteraction: new Date().toISOString()
       });
 
-      // 3. Context retrieval (placeholder for future implementation)
-      const context = null;
+      // 3. Get conversation context and voice guidance from memory
+      let contextText = '';
+      let voiceGuidance = '';
+      
+      if (this.memoryClient) {
+        try {
+          // Get past conversation context
+          contextText = await this.memoryClient.buildContextForDraft(
+            message.from.emailAddress.address,
+            message.body
+          );
+          
+          // Get voice guidance
+          voiceGuidance = await this.memoryClient.getVoiceGuidance();
+          
+          console.log(`📚 Retrieved context for ${message.from.emailAddress.address}`);
+        } catch (error) {
+          console.error('Error retrieving memory context:', error);
+        }
+      }
 
-      // 4. Generate draft reply
-      const draftReply = await this.generateDraftReply(message, context);
+      // 4. Generate draft reply with context and voice guidance
+      const draftReply = await this.generateDraftReply(message, contextText, voiceGuidance);
       
       // 5. Create Outlook draft
       const draft = await this.outlookClient.createReplyDraft(messageId, draftReply.text);
@@ -206,8 +240,22 @@ class InboxScoutAgent {
         voiceScore: draftReply.voiceScore
       });
 
-      // 8. Content indexing (placeholder for future implementation)
-      console.log('Content indexing placeholder - will implement later');
+      // 8. Store conversation in memory for future reference
+      if (this.memoryClient) {
+        try {
+          await this.memoryClient.storeConversation({
+            emailId: messageId,
+            subject: message.subject,
+            from: message.from.emailAddress.address,
+            body: message.body,
+            timestamp: message.receivedDateTime,
+            summary: `Email from ${message.from.emailAddress.name || message.from.emailAddress.address}`
+          });
+          console.log('💾 Stored conversation in memory');
+        } catch (error) {
+          console.error('Error storing conversation:', error);
+        }
+      }
 
       return {
         draftId: draft.id,
@@ -238,7 +286,7 @@ class InboxScoutAgent {
     );
   }
 
-  private async generateDraftReply(message: EmailMessage, context: any): Promise<{ text: string; voiceScore: number }> {
+  private async generateDraftReply(message: EmailMessage, contextText: string, voiceGuidance: string): Promise<{ text: string; voiceScore: number }> {
     try {
       const prompt = `
 You are Amy, a business owner who runs an online business. Write a professional, friendly email reply.
@@ -248,15 +296,17 @@ Subject: ${message.subject}
 From: ${message.from.emailAddress.name} (${message.from.emailAddress.address})
 Body: ${message.body}
 
-Context from previous interactions:
-${context || 'No previous context available.'}
+${contextText || ''}
+
+${voiceGuidance || ''}
 
 Write a reply that:
 1. Is professional but warm and friendly
-2. Matches Amy's voice and tone
-3. Addresses the sender's needs
-4. Is concise but complete
-5. Maintains business relationships
+2. Matches Amy's voice and tone (use the voice profile above)
+3. References past conversations when relevant
+4. Addresses the sender's needs directly
+5. Is concise but complete (≤180 words unless detail needed)
+6. Maintains business relationships
 
 Reply:`;
 
