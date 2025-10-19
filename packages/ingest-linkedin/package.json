@@ -1,0 +1,27 @@
+{
+  "name": "@inbox-scout/ingest-linkedin",
+  "version": "1.0.0",
+  "description": "LinkedIn data export parsing and voice pack creation",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/ingest.ts",
+    "start": "node dist/ingest.js",
+    "test": "jest",
+    "ingest": "tsx src/ingest.ts"
+  },
+  "dependencies": {
+    "yauzl": "^2.10.0",
+    "csv-parser": "^3.0.0",
+    "@inbox-scout/memory-pinecone": "workspace:*",
+    "@inbox-scout/mcp-notion": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/yauzl": "^2.10.0",
+    "typescript": "^5.0.0",
+    "tsx": "^4.0.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0"
+  }
+}
