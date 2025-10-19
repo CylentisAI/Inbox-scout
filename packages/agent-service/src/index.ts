@@ -33,6 +33,21 @@ class InboxScoutAgent {
   private isProcessing: boolean = false;
 
   constructor() {
+    // Check for required environment variables
+    const requiredEnvVars = [
+      'OPENAI_API_KEY',
+      'PINECONE_API_KEY', 
+      'PINECONE_ENVIRONMENT',
+      'PINECONE_INDEX_NAME'
+    ];
+    
+    const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+    if (missingVars.length > 0) {
+      console.error('❌ Missing required environment variables:', missingVars.join(', '));
+      console.error('Please set all required environment variables before starting the service.');
+      process.exit(1);
+    }
+
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
@@ -397,11 +412,14 @@ ${contextText}`;
   async start(port: number = 3000): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        this.app.listen(port, () => {
-          console.log(`🚀 InboxScout Agent running on port ${port}`);
+        // Bind to 0.0.0.0 for Railway deployment
+        const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';
+        
+        this.app.listen(port, host, () => {
+          console.log(`🚀 InboxScout Agent running on ${host}:${port}`);
           console.log(`📧 Monitoring: ${process.env.CLIENT_EMAIL || 'amy@alignedtribe.com'}`);
           console.log(`⏰ Timezone: ${process.env.CLIENT_TIMEZONE || 'Australia/Sydney'}`);
-          console.log(`🏥 Health check: http://localhost:${port}/health`);
+          console.log(`🏥 Health check: http://${host}:${port}/health`);
           resolve();
         });
       } catch (error) {
