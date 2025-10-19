@@ -13,7 +13,16 @@ const requiredEnvVars = [
   'OPENAI_API_KEY',
   'PINECONE_API_KEY', 
   'PINECONE_ENVIRONMENT',
-  'PINECONE_INDEX_NAME'
+  'PINECONE_INDEX_NAME',
+  'NOTION_API_KEY',
+  'NOTION_CONTACTS_DB_ID',
+  'NOTION_DRAFTS_DB_ID',
+  'NOTION_KB_DB_ID',
+  'NOTION_INTERACTIONS_DB_ID',
+  'NOTION_VOICE_PACK_DB_ID',
+  'AZURE_TENANT_ID',
+  'AZURE_CLIENT_ID',
+  'AZURE_CLIENT_SECRET'
 ];
 
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
