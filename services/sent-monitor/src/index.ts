@@ -33,7 +33,7 @@ interface DraftEdit {
 class SentMonitorService {
   private app: express.Application;
   private memoryClient: PineconeMemoryClient;
-  private dmp: diff_match_patch;
+  private dmp: InstanceType<typeof diff_match_patch>;
   private processedEmails: Set<string> = new Set();
 
   constructor() {
@@ -171,7 +171,7 @@ class SentMonitorService {
     const removedPhrases: string[] = [];
     const styleChanges: string[] = [];
 
-    diffs.forEach(([operation, text]) => {
+    diffs.forEach(([operation, text]: [number, string]) => {
       if (operation === 1) { // Added
         changes.push(`Added: "${text}"`);
         addedPhrases.push(text);

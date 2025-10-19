@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as yauzl from 'yauzl';
 import { createReadStream } from 'fs';
-import { parse } from 'csv-parser';
+import csv from 'csv-parser';
 import { PineconeMemoryClient } from '@inbox-scout/memory-pinecone';
 
 interface LinkedInContent {
@@ -163,15 +163,15 @@ class LinkedInIngester {
       const results: any[] = [];
       
       createReadStream(filePath)
-        .pipe(parse())
-        .on('data', (data) => {
+        .pipe(csv())
+        .on('data', (data: any) => {
           results.push(data);
         })
         .on('end', () => {
           this.processContentResults(results, filename);
           resolve();
         })
-        .on('error', (error) => {
+        .on('error', (error: any) => {
           reject(error);
         });
     });

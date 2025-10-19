@@ -79,6 +79,10 @@ class OutlookGraphClient {
         clientCredentialRequest
       );
 
+      if (!response || !response.accessToken) {
+        throw new Error('Failed to acquire access token: no response or token');
+      }
+
       this.accessToken = response.accessToken;
       this.tokenExpiry = Date.now() + (response.expiresOn?.getTime() || 0) - 60000; // 1 min buffer
       

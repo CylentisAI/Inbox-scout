@@ -204,7 +204,7 @@ class InboxScoutAgent {
     try {
       // Get voice examples for context
       const voiceExamples = await this.memoryClient.getVoiceExamples(
-        message.body.content,
+        message.body,
         'Greeting'
       );
 
@@ -231,7 +231,7 @@ ${contextText}`;
         model: 'gpt-4',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: initialEmailText },
+          { role: 'user', content: message.body },
         ],
         max_tokens: 300,
         temperature: 0.7,

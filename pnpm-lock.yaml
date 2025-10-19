@@ -36,6 +36,9 @@ importers:
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.22
+      '@types/node-cron':
+        specifier: ^3.0.0
+        version: 3.0.11
       tsx:
         specifier: ^4.0.0
         version: 4.20.6
@@ -1263,6 +1266,10 @@ packages:
 
   /@types/mime@1.3.5:
     resolution: {integrity: sha512-/pyBZWSLD2n0dcHE3hq8s8ZvcETHtEuF+3E7XVt0Ig2nvsVQXdghHVcEkIWjy9A0wKfTn97a/PSDYohKIlnP/w==}
+    dev: true
+
+  /@types/node-cron@3.0.11:
+    resolution: {integrity: sha512-0ikrnug3/IyneSHqCBeslAhlK2aBfYek1fGo4bP4QnZPmiqSGRK+Oy7ZMisLWkesffJvQ1cqAcBnJC+8+nxIAg==}
     dev: true
 
   /@types/node-fetch@2.6.13:
