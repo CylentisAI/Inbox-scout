@@ -59,7 +59,10 @@ export class MCPOutlookClient {
       }
 
       this.accessToken = response.accessToken;
-      this.tokenExpiry = Date.now() + (response.expiresOn?.getTime() || 0) - 60000; // 1 min buffer
+      // expiresOn is already an absolute timestamp, subtract 5 min buffer
+      this.tokenExpiry = (response.expiresOn?.getTime() || Date.now() + 3600000) - 300000;
+      
+      console.log(`Token acquired, expires at: ${new Date(this.tokenExpiry).toISOString()}`);
       
       return this.accessToken;
     } catch (error) {
