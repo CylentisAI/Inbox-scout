@@ -14,8 +14,7 @@
     "express": "^4.18.0",
     "diff-match-patch": "^1.0.5",
     "@inbox-scout/mcp-outlook": "workspace:*",
-    "@inbox-scout/mcp-notion": "workspace:*",
-    "@inbox-scout/memory-pinecone": "workspace:*"
+    "@inbox-scout/mcp-notion": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

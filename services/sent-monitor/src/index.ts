@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import express from 'express';
 import { diff_match_patch } from 'diff-match-patch';
-import { PineconeMemoryClient } from '@inbox-scout/memory-pinecone';
+// import { PineconeMemoryClient } from '@inbox-scout/memory-pinecone';
 
 interface SentEmail {
   id: string;
@@ -32,7 +32,7 @@ interface DraftEdit {
 
 class SentMonitorService {
   private app: express.Application;
-  private memoryClient: PineconeMemoryClient;
+  // private memoryClient: PineconeMemoryClient;
   private dmp: InstanceType<typeof diff_match_patch>;
   private processedEmails: Set<string> = new Set();
 
@@ -40,12 +40,12 @@ class SentMonitorService {
     this.app = express();
     this.dmp = new diff_match_patch();
     
-    this.memoryClient = new PineconeMemoryClient(
-      process.env.PINECONE_API_KEY!,
-      process.env.PINECONE_ENVIRONMENT!,
-      process.env.PINECONE_INDEX_NAME!,
-      process.env.OPENAI_API_KEY!
-    );
+    // this.memoryClient = new PineconeMemoryClient(
+    //   process.env.PINECONE_API_KEY!,
+    //   process.env.PINECONE_ENVIRONMENT!,
+    //   process.env.PINECONE_INDEX_NAME!,
+    //   process.env.OPENAI_API_KEY!
+    // );
 
     this.setupExpress();
     this.setupCronJob();
@@ -251,17 +251,17 @@ class SentMonitorService {
     try {
       // Update voice pack with new insights
       if (editAnalysis.voiceInsights.addedPhrases.length > 0) {
-        await this.memoryClient.updateVoiceFromEdit(
-          editAnalysis.originalText,
-          editAnalysis.editedText,
-          {
-            source: 'email_edit',
-            draftId: draft.id,
-            addedPhrases: editAnalysis.voiceInsights.addedPhrases,
-            removedPhrases: editAnalysis.voiceInsights.removedPhrases,
-            styleChanges: editAnalysis.voiceInsights.styleChanges,
-          }
-        );
+        // await this.memoryClient.updateVoiceFromEdit(
+        //   editAnalysis.originalText,
+        //   editAnalysis.editedText,
+        //   {
+        //     source: 'email_edit',
+        //     draftId: draft.id,
+        //     addedPhrases: editAnalysis.voiceInsights.addedPhrases,
+        //     removedPhrases: editAnalysis.voiceInsights.removedPhrases,
+        //     styleChanges: editAnalysis.voiceInsights.styleChanges,
+        //   }
+        // );
       }
 
       // Log the learning event
@@ -294,7 +294,7 @@ class SentMonitorService {
 
   private async getVoiceInsights(): Promise<any> {
     try {
-      // TODO: Get voice insights from Pinecone
+      // TODO: Skip Pinecone voice insights for now
       // const voiceExamples = await this.memoryClient.searchSimilar(
       //   'Amy voice examples',
       //   'voice',
