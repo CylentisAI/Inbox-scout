@@ -1,0 +1,42 @@
+﻿{
+  "name": "inbox-scout-amy",
+  "version": "1.0.0",
+  "description": "AI-powered inbox management service for Amy @ alignedtribe.com - Built with MCP, Notion, and Pinecone integration. Includes LinkedIn voice learning and Outlook draft creation.",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "services/*"
+  ],
+  "scripts": {
+    "dev": "pnpm run --parallel dev",
+    "build": "pnpm run --recursive build",
+    "test": "pnpm run --recursive test",
+    "lint": "pnpm run --recursive lint",
+    "type-check": "pnpm run --recursive type-check",
+    "deploy": "pnpm run build && pnpm run --recursive deploy",
+    "setup-client": "node scripts/setup-client.js",
+    "ingest-linkedin": "node packages/ingest-linkedin/src/ingest.js",
+    "start": "pnpm run --parallel start"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/node-cron": "^3.0.0",
+    "typescript": "^5.0.0",
+    "tsx": "^4.0.0",
+    "@types/diff-match-patch": "^1.0.36"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^2.5.0",
+    "@notionhq/client": "^2.2.0",
+    "@pinecone-database/pinecone": "^1.1.0",
+    "openai": "^4.0.0",
+    "diff-match-patch": "^1.0.5",
+    "node-cron": "^3.0.3",
+    "yauzl": "^2.10.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}
