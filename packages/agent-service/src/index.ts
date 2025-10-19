@@ -186,17 +186,8 @@ class InboxScoutAgent {
         lastInteraction: new Date().toISOString()
       });
 
-      // 3. Retrieve context from Pinecone (optional)
-      let context = null;
-      try {
-        context = await this.memoryClient.retrieveContext(
-          message.body,
-          message.from.emailAddress.address
-        );
-      } catch (error) {
-        console.log('Pinecone context retrieval failed, continuing without context:', (error as Error).message);
-        context = null;
-      }
+      // 3. Skip Pinecone for now - just use null context
+      const context = null;
 
       // 4. Generate draft reply
       const draftReply = await this.generateDraftReply(message, context);
@@ -226,16 +217,8 @@ class InboxScoutAgent {
         voiceScore: draftReply.voiceScore
       });
 
-      // 8. Index email content (optional)
-      try {
-        await this.memoryClient.indexEmail(messageId, message.body, {
-          contactEmail: message.from.emailAddress.address,
-          subject: message.subject,
-          receivedDateTime: message.receivedDateTime,
-        });
-      } catch (error) {
-        console.log('Pinecone indexing failed, continuing without indexing:', (error as Error).message);
-      }
+      // 8. Skip Pinecone indexing for now
+      console.log('Skipping Pinecone indexing - will implement later');
 
       return {
         draftId: draft.id,
