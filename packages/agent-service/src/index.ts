@@ -432,7 +432,7 @@ ${contextText}`;
 
 // Start the agent service
 const agent = new InboxScoutAgent();
-const port = parseInt(process.env.AGENT_SERVICE_PORT || '3000');
+const port = parseInt(process.env.PORT || process.env.AGENT_SERVICE_PORT || '3000');
 
 agent.start(port).catch((error) => {
   console.error('❌ Failed to start InboxScout Agent:', error);
