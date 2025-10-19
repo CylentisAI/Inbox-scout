@@ -2,7 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import cron from 'node-cron';
 import OpenAI from 'openai';
-// import { PineconeMemoryClient } from '@inbox-scout/memory-pinecone';
 import { MCPOutlookClient } from '@inbox-scout/mcp-outlook';
 import { MCPNotionClient } from '@inbox-scout/mcp-notion';
 
@@ -30,7 +29,6 @@ interface DraftResult {
 
 class InboxScoutAgent {
   private openai: OpenAI;
-  // private memoryClient: PineconeMemoryClient;
   private outlookClient: MCPOutlookClient;
   private notionClient: MCPNotionClient;
   private app: express.Application;
@@ -62,12 +60,6 @@ class InboxScoutAgent {
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    // this.memoryClient = new PineconeMemoryClient(
-    //   process.env.PINECONE_API_KEY!,
-    //   process.env.PINECONE_ENVIRONMENT!,
-    //   process.env.PINECONE_INDEX_NAME!,
-    //   process.env.OPENAI_API_KEY!
-    // );
 
     this.outlookClient = new MCPOutlookClient(
       process.env.AZURE_TENANT_ID!,
@@ -183,7 +175,7 @@ class InboxScoutAgent {
         lastInteraction: new Date().toISOString()
       });
 
-      // 3. Skip Pinecone for now - just use null context
+      // 3. Context retrieval (placeholder for future implementation)
       const context = null;
 
       // 4. Generate draft reply
@@ -214,8 +206,8 @@ class InboxScoutAgent {
         voiceScore: draftReply.voiceScore
       });
 
-      // 8. Skip Pinecone indexing for now
-      console.log('Skipping Pinecone indexing - will implement later');
+      // 8. Content indexing (placeholder for future implementation)
+      console.log('Content indexing placeholder - will implement later');
 
       return {
         draftId: draft.id,

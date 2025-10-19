@@ -3,7 +3,6 @@ import * as path from 'path';
 import * as yauzl from 'yauzl';
 import { createReadStream } from 'fs';
 import csv from 'csv-parser';
-// import { PineconeMemoryClient } from '@inbox-scout/memory-pinecone';
 
 interface LinkedInContent {
   text: string;
@@ -35,16 +34,9 @@ interface VoiceProfile {
 }
 
 class LinkedInIngester {
-  // private memoryClient: PineconeMemoryClient;
   private extractedContent: LinkedInContent[] = [];
 
   constructor() {
-    // this.memoryClient = new PineconeMemoryClient(
-    //   process.env.PINECONE_API_KEY!,
-    //   process.env.PINECONE_ENVIRONMENT!,
-    //   process.env.PINECONE_INDEX_NAME!,
-    //   process.env.OPENAI_API_KEY!
-    // );
   }
 
   async ingestLinkedInExport(zipPath: string): Promise<VoiceProfile> {
@@ -60,7 +52,7 @@ class LinkedInIngester {
       // 3. Build voice profile
       const voiceProfile = this.buildVoiceProfile();
       
-      // 4. Skip Pinecone indexing
+      // 4. Content indexing (placeholder for future implementation)
       await this.indexVoiceContent();
       
       // 5. Save voice profile to Notion
@@ -428,7 +420,7 @@ class LinkedInIngester {
       }));
 
       // await this.memoryClient.indexVoice(voiceItems);
-      console.log(`Skipped Pinecone indexing for ${voiceItems.length} voice items`);
+      console.log(`Content indexing placeholder for ${voiceItems.length} voice items`);
       
     } catch (error) {
       console.error('Error indexing voice content:', error);

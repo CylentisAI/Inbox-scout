@@ -1,8 +1,8 @@
 ﻿# Inbox Scout - AI-Powered Email Management Service
 
-A sophisticated AI-powered inbox management system built with MCP (Model Context Protocol), Notion integration, and Pinecone vector memory. This instance is configured for **Amy** at my@alignedtribe.com.
+A sophisticated AI-powered inbox management system built with MCP (Model Context Protocol) and Notion integration. This instance is configured for **Amy** at amy@alignedtribe.com.
 
-## ðŸŽ¯ What This Does for Amy
+## 🎯 What This Does for Amy
 
 - **Morning Digest**: Daily 7:30 AM Sydney time email with draft replies ready to review
 - **Smart Drafts**: AI creates Outlook reply drafts based on Amy's voice and style
@@ -10,12 +10,11 @@ A sophisticated AI-powered inbox management system built with MCP (Model Context
 - **Contact Management**: Tracks interactions and builds knowledge base in Notion
 - **No Auto-Send**: Amy reviews and sends all replies manually (for now)
 
-## ðŸ—ï¸ Architecture
+## 🏗️ Architecture
 
 ### Packages
 - **mcp-outlook**: Microsoft Graph API integration (Office 365)
 - **mcp-notion**: Notion API for contact management and interaction tracking  
-- **memory-pinecone**: Vector database for email content indexing and voice learning
 - **ingest-linkedin**: LinkedIn profile parsing and voice pack creation
 - **agent-service**: Core AI agent orchestration using AgentKit
 
@@ -23,14 +22,14 @@ A sophisticated AI-powered inbox management system built with MCP (Model Context
 - **digest**: Daily 7:30 AM Sydney time email digest with Notion + Outlook links
 - **sent-monitor**: Real-time monitoring of sent emails with voice/style updates
 
-## ðŸš€ Quick Start
+## 🚀 Quick Start
 
 1. Copy .env.example to .env
 2. Fill in your API credentials (see setup guide below)
 3. Run pnpm install
 4. Run pnpm dev
 
-## ðŸ”§ Setup Guide
+## ⚙️ Setup Guide
 
 ### 1. Microsoft Graph API (Office 365)
 - Create Azure App Registration
@@ -42,70 +41,62 @@ A sophisticated AI-powered inbox management system built with MCP (Model Context
 - Set up databases: Contacts, Drafts, Knowledge Base, Interactions
 - Generate API key
 
-### 3. Pinecone Setup
-- Create Pinecone account
-- Set up index: inbox-scout-amy-memory
-- Configure namespaces: oice, emails, 
-otes, kb
-
-### 4. LinkedIn Voice Pack
-- Amy exports her LinkedIn data (Settings â†’ Privacy â†’ Get a copy)
+### 3. LinkedIn Voice Pack
+- Amy exports her LinkedIn data (Settings → Privacy → Get a copy)
 - Run pnpm ingest-linkedin with the ZIP file
 - System builds voice profile from her posts, articles, comments
 
-## ðŸ³ Railway Deployment
+## 🐳 Railway Deployment
 
 This is configured for Railway deployment:
 
-`ash
+```bash
 # Deploy to Railway
 railway login
 railway link
 railway up
-`
+```
 
-## ðŸ”„ Future Client Replication
+## 🔄 Future Client Replication
 
 This repository serves as a template for creating inbox management services for other clients:
 
 1. **Fork this repository**
 2. **Update client config** in .env:
    - CLIENT_NAME, CLIENT_EMAIL, CLIENT_DOMAIN
-   - PINECONE_INDEX_NAME (include client identifier)
 3. **Deploy with client's API credentials**
 4. **Set up their LinkedIn voice pack**
 
 ### Multi-Client Architecture
 - Each client gets their own Railway service
-- Separate Pinecone indexes per client
 - Shared codebase with client-specific configurations
 - Docker containers isolate client environments
 
-## ðŸŽ›ï¸ Amy's Voice Profile
+## 🎭 Amy's Voice Profile
 
 Based on the provided specifications:
 - **Tone**: Warm, direct, confident; plain English; no emojis
 - **Cadence**: 2-4 short paragraphs; bullets OK; avoid walls of text
 - **Signature moves**: Start with 1-sentence why, address one concern, give 1 clear next step
-- **Phrases to favor**: "Happy toâ€¦", "Two quick optionsâ€¦", "If helpful, I canâ€¦"
-- **Phrases to avoid**: "Per my lastâ€¦", "Kindlyâ€¦"
-- **Length**: â‰¤180 words unless explicitly asked for detail
+- **Phrases to favor**: "Happy to…", "Two quick options…", "If helpful, I can…"
+- **Phrases to avoid**: "Per my last…", "Kindly…"
+- **Length**: ≤180 words unless explicitly asked for detail
 
-## ðŸ“Š Monitoring & Alerts
+## 📊 Monitoring & Alerts
 
 - Service health monitoring via Railway
 - Email digest delivery confirmation
 - Voice learning progress tracking
 - Alert webhook for service issues
 
-## ðŸ”’ Security Notes
+## 🔒 Security Notes
 
 - All API keys stored as Railway environment variables
 - No auto-sending of customer emails (Amy reviews all)
-- Minimal data retention outside Notion/Pinecone
+- Minimal data retention outside Notion
 - Office 365 delegated permissions (no admin access needed)
 
 ---
 
-**Built by Aaron for Amy** â¤ï¸
+**Built by Aaron for Amy** ❤️
 *Future state: Automated client onboarding via Airtable + GitHub Actions*

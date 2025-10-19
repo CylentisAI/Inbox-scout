@@ -11,9 +11,6 @@ console.log('================================');
 // Check environment variables
 const requiredEnvVars = [
   'OPENAI_API_KEY',
-  // 'PINECONE_API_KEY', 
-  // 'PINECONE_ENVIRONMENT',
-  // 'PINECONE_INDEX_NAME',
   'NOTION_API_KEY',
   'NOTION_CONTACTS_DB_ID',
   'NOTION_DRAFTS_DB_ID',

@@ -1,7 +1,7 @@
 ﻿{
   "name": "inbox-scout-amy",
   "version": "1.0.0",
-  "description": "AI-powered inbox management service for Amy @ alignedtribe.com - Built with MCP, Notion, and Pinecone integration. Includes LinkedIn voice learning and Outlook draft creation.",
+  "description": "AI-powered inbox management service for Amy @ alignedtribe.com - Built with MCP and Notion integration. Includes LinkedIn voice learning and Outlook draft creation.",
   "private": true,
   "workspaces": [
     "packages/*",
