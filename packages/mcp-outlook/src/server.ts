@@ -100,8 +100,8 @@ class OutlookGraphClient {
       },
     });
 
-    if (!response.ok) {
-      throw new Error(`Graph API request failed: ${response.status} ${response.statusText}`);
+    if (!response || !response.ok) {
+      throw new Error(`Graph API request failed: ${response?.status} ${response?.statusText}`);
     }
 
     return response.json();
@@ -222,17 +222,10 @@ class OutlookMCPServer {
   private graphClient: OutlookGraphClient;
 
   constructor() {
-    this.server = new Server(
-      {
-        name: 'outlook-mcp',
-        version: '1.0.0',
-      },
-      {
-        capabilities: {
-          tools: {},
-        },
-      }
-    );
+    this.server = new Server({
+      name: 'outlook-mcp',
+      version: '1.0.0',
+    });
 
     // Initialize Graph client with environment variables
     const clientId = process.env.AZURE_CLIENT_ID;
@@ -380,7 +373,7 @@ class OutlookMCPServer {
       try {
         switch (name) {
           case 'get_unread_messages':
-            const limit = args.limit || 50;
+            const limit = (args as any)?.limit || 50;
             const messages = await this.graphClient.getUnreadMessages(limit);
             return {
               content: [
@@ -392,7 +385,10 @@ class OutlookMCPServer {
             };
 
           case 'get_message':
-            const message = await this.graphClient.getMessage(args.messageId, args.preferText);
+            const message = await this.graphClient.getMessage(
+              (args as any)?.messageId, 
+              (args as any)?.preferText
+            );
             return {
               content: [
                 {
@@ -403,7 +399,7 @@ class OutlookMCPServer {
             };
 
           case 'create_reply_draft':
-            const draftId = await this.graphClient.createReplyDraft(args.messageId);
+            const draftId = await this.graphClient.createReplyDraft((args as any)?.messageId);
             return {
               content: [
                 {
@@ -414,7 +410,11 @@ class OutlookMCPServer {
             };
 
           case 'update_draft':
-            await this.graphClient.updateDraft(args.draftId, args.subject, args.bodyHtml);
+            await this.graphClient.updateDraft(
+              (args as any)?.draftId, 
+              (args as any)?.subject, 
+              (args as any)?.bodyHtml
+            );
             return {
               content: [
                 {
@@ -425,7 +425,7 @@ class OutlookMCPServer {
             };
 
           case 'get_message_link':
-            const webLink = await this.graphClient.getMessageLink(args.messageId);
+            const webLink = await this.graphClient.getMessageLink((args as any)?.messageId);
             return {
               content: [
                 {
@@ -436,7 +436,11 @@ class OutlookMCPServer {
             };
 
           case 'send_digest':
-            await this.graphClient.sendDigest(args.to, args.subject, args.htmlBody);
+            await this.graphClient.sendDigest(
+              (args as any)?.to, 
+              (args as any)?.subject, 
+              (args as any)?.htmlBody
+            );
             return {
               content: [
                 {
@@ -447,7 +451,7 @@ class OutlookMCPServer {
             };
 
           case 'mark_as_read':
-            await this.graphClient.markAsRead(args.messageId);
+            await this.graphClient.markAsRead((args as any)?.messageId);
             return {
               content: [
                 {

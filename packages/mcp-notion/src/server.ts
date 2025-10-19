@@ -518,17 +518,10 @@ class NotionMCPServer {
   private notionClient: NotionClient;
 
   constructor() {
-    this.server = new Server(
-      {
-        name: 'notion-mcp',
-        version: '1.0.0',
-      },
-      {
-        capabilities: {
-          tools: {},
-        },
-      }
-    );
+    this.server = new Server({
+      name: 'notion-mcp',
+      version: '1.0.0',
+    });
 
     // Initialize Notion client with environment variables
     const apiKey = process.env.NOTION_API_KEY;
@@ -845,7 +838,7 @@ class NotionMCPServer {
       try {
         switch (name) {
           case 'find_contact':
-            const contact = await this.notionClient.findContact(args.email);
+            const contact = await this.notionClient.findContact((args as any)?.email);
             return {
               content: [
                 {
@@ -856,7 +849,7 @@ class NotionMCPServer {
             };
 
           case 'upsert_contact':
-            const upsertedContact = await this.notionClient.upsertContact(args);
+            const upsertedContact = await this.notionClient.upsertContact(args as any);
             return {
               content: [
                 {
@@ -867,7 +860,7 @@ class NotionMCPServer {
             };
 
           case 'create_draft':
-            const draft = await this.notionClient.createDraft(args);
+            const draft = await this.notionClient.createDraft(args as any);
             return {
               content: [
                 {
@@ -878,7 +871,7 @@ class NotionMCPServer {
             };
 
           case 'update_draft':
-            const updatedDraft = await this.notionClient.updateDraft(args.draftId, args);
+            const updatedDraft = await this.notionClient.updateDraft((args as any)?.draftId, args as any);
             return {
               content: [
                 {
@@ -900,7 +893,7 @@ class NotionMCPServer {
             };
 
           case 'log_interaction':
-            const interaction = await this.notionClient.logInteraction(args);
+            const interaction = await this.notionClient.logInteraction(args as any);
             return {
               content: [
                 {
@@ -911,7 +904,7 @@ class NotionMCPServer {
             };
 
           case 'upsert_knowledge_base':
-            const kb = await this.notionClient.upsertKnowledgeBase(args);
+            const kb = await this.notionClient.upsertKnowledgeBase(args as any);
             return {
               content: [
                 {
@@ -922,7 +915,10 @@ class NotionMCPServer {
             };
 
           case 'query_knowledge_base':
-            const kbResults = await this.notionClient.queryKnowledgeBase(args.query, args.limit);
+            const kbResults = await this.notionClient.queryKnowledgeBase(
+              (args as any)?.query, 
+              (args as any)?.limit
+            );
             return {
               content: [
                 {
@@ -933,7 +929,7 @@ class NotionMCPServer {
             };
 
           case 'upsert_voice_pack':
-            const voicePack = await this.notionClient.upsertVoicePack(args);
+            const voicePack = await this.notionClient.upsertVoicePack(args as any);
             return {
               content: [
                 {
