@@ -395,11 +395,19 @@ ${contextText}`;
   }
 
   async start(port: number = 3000): Promise<void> {
-    return new Promise((resolve) => {
-      this.app.listen(port, () => {
-        console.log(`Inbox Scout Agent running on port ${port}`);
-        resolve();
-      });
+    return new Promise((resolve, reject) => {
+      try {
+        this.app.listen(port, () => {
+          console.log(`🚀 InboxScout Agent running on port ${port}`);
+          console.log(`📧 Monitoring: ${process.env.CLIENT_EMAIL || 'amy@alignedtribe.com'}`);
+          console.log(`⏰ Timezone: ${process.env.CLIENT_TIMEZONE || 'Australia/Sydney'}`);
+          console.log(`🏥 Health check: http://localhost:${port}/health`);
+          resolve();
+        });
+      } catch (error) {
+        console.error('❌ Failed to start server:', error);
+        reject(error);
+      }
     });
   }
 }
@@ -408,4 +416,7 @@ ${contextText}`;
 const agent = new InboxScoutAgent();
 const port = parseInt(process.env.AGENT_SERVICE_PORT || '3000');
 
-agent.start(port).catch(console.error);
+agent.start(port).catch((error) => {
+  console.error('❌ Failed to start InboxScout Agent:', error);
+  process.exit(1);
+});
