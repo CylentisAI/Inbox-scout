@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import cron from 'node-cron';
 import OpenAI from 'openai';
-import { PineconeMemoryClient } from '@inbox-scout/memory-pinecone';
+// import { PineconeMemoryClient } from '@inbox-scout/memory-pinecone';
 import { MCPOutlookClient } from '@inbox-scout/mcp-outlook';
 import { MCPNotionClient } from '@inbox-scout/mcp-notion';
 
@@ -30,7 +30,7 @@ interface DraftResult {
 
 class InboxScoutAgent {
   private openai: OpenAI;
-  private memoryClient: PineconeMemoryClient;
+  // private memoryClient: PineconeMemoryClient;
   private outlookClient: MCPOutlookClient;
   private notionClient: MCPNotionClient;
   private app: express.Application;
@@ -40,9 +40,6 @@ class InboxScoutAgent {
     // Check for required environment variables
     const requiredEnvVars = [
       'OPENAI_API_KEY',
-      'PINECONE_API_KEY', 
-      'PINECONE_ENVIRONMENT',
-      'PINECONE_INDEX_NAME',
       'NOTION_API_KEY',
       'NOTION_CONTACTS_DB_ID',
       'NOTION_DRAFTS_DB_ID',
@@ -65,12 +62,12 @@ class InboxScoutAgent {
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    this.memoryClient = new PineconeMemoryClient(
-      process.env.PINECONE_API_KEY!,
-      process.env.PINECONE_ENVIRONMENT!,
-      process.env.PINECONE_INDEX_NAME!,
-      process.env.OPENAI_API_KEY!
-    );
+    // this.memoryClient = new PineconeMemoryClient(
+    //   process.env.PINECONE_API_KEY!,
+    //   process.env.PINECONE_ENVIRONMENT!,
+    //   process.env.PINECONE_INDEX_NAME!,
+    //   process.env.OPENAI_API_KEY!
+    // );
 
     this.outlookClient = new MCPOutlookClient(
       process.env.AZURE_TENANT_ID!,
