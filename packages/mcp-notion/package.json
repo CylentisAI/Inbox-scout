@@ -2,7 +2,7 @@
   "name": "@inbox-scout/mcp-notion",
   "version": "1.0.0",
   "description": "Notion API integration for contact management and interaction tracking",
-  "main": "dist/index.js",
+  "main": "dist/client.js",
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/server.ts",

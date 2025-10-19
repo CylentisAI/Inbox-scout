@@ -2,7 +2,7 @@
   "name": "@inbox-scout/mcp-outlook",
   "version": "1.0.0",
   "description": "Microsoft Graph API integration for Outlook email operations",
-  "main": "dist/index.js",
+  "main": "dist/client.js",
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/server.ts",

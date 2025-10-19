@@ -3,6 +3,8 @@ import cors from 'cors';
 import cron from 'node-cron';
 import OpenAI from 'openai';
 import { PineconeMemoryClient } from '@inbox-scout/memory-pinecone';
+import { MCPOutlookClient } from '@inbox-scout/mcp-outlook';
+import { MCPNotionClient } from '@inbox-scout/mcp-notion';
 
 interface EmailMessage {
   id: string;
@@ -29,6 +31,8 @@ interface DraftResult {
 class InboxScoutAgent {
   private openai: OpenAI;
   private memoryClient: PineconeMemoryClient;
+  private outlookClient: MCPOutlookClient;
+  private notionClient: MCPNotionClient;
   private app: express.Application;
   private isProcessing: boolean = false;
 
@@ -38,7 +42,16 @@ class InboxScoutAgent {
       'OPENAI_API_KEY',
       'PINECONE_API_KEY', 
       'PINECONE_ENVIRONMENT',
-      'PINECONE_INDEX_NAME'
+      'PINECONE_INDEX_NAME',
+      'NOTION_API_KEY',
+      'NOTION_CONTACTS_DB_ID',
+      'NOTION_DRAFTS_DB_ID',
+      'NOTION_KB_DB_ID',
+      'NOTION_INTERACTIONS_DB_ID',
+      'NOTION_VOICE_PACK_DB_ID',
+      'AZURE_TENANT_ID',
+      'AZURE_CLIENT_ID',
+      'AZURE_CLIENT_SECRET'
     ];
     
     const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
@@ -59,6 +72,23 @@ class InboxScoutAgent {
       process.env.OPENAI_API_KEY!
     );
 
+    this.outlookClient = new MCPOutlookClient(
+      process.env.AZURE_TENANT_ID!,
+      process.env.AZURE_CLIENT_ID!,
+      process.env.AZURE_CLIENT_SECRET!
+    );
+
+    this.notionClient = new MCPNotionClient(
+      process.env.NOTION_API_KEY!,
+      {
+        contacts: process.env.NOTION_CONTACTS_DB_ID!,
+        drafts: process.env.NOTION_DRAFTS_DB_ID!,
+        interactions: process.env.NOTION_INTERACTIONS_DB_ID!,
+        knowledgeBase: process.env.NOTION_KB_DB_ID!,
+        voicePack: process.env.NOTION_VOICE_PACK_DB_ID!
+      }
+    );
+
     this.app = express();
     this.setupExpress();
     this.setupCronJobs();
@@ -70,37 +100,26 @@ class InboxScoutAgent {
 
     // Health check endpoint
     this.app.get('/health', (req, res) => {
-      res.json({ 
-        status: 'healthy', 
+      res.json({
+        status: 'healthy',
         timestamp: new Date().toISOString(),
-        processing: this.isProcessing 
+        service: 'InboxScout Agent',
+        version: '1.0.0'
       });
     });
 
-    // Process single message endpoint
-    this.app.post('/process-message', async (req, res) => {
+    // Manual trigger endpoint for testing
+    this.app.post('/process-emails', async (req, res) => {
       try {
-        const { messageId } = req.body;
-        const result = await this.processMessage(messageId);
-        res.json(result);
-      } catch (error) {
-        console.error('Error processing message:', error);
-        res.status(500).json({ error: 'Failed to process message' });
-      }
-    });
+        if (this.isProcessing) {
+          return res.status(409).json({ error: 'Already processing emails' });
+        }
 
-    // Get voice examples endpoint
-    this.app.get('/voice-examples', async (req, res) => {
-      try {
-        const { context, voiceElement } = req.query;
-        const examples = await this.memoryClient.getVoiceExamples(
-          context as string,
-          voiceElement as string
-        );
-        res.json(examples);
+        await this.processUnreadEmails();
+        res.json({ message: 'Email processing completed' });
       } catch (error) {
-        console.error('Error getting voice examples:', error);
-        res.status(500).json({ error: 'Failed to get voice examples' });
+        console.error('Error in manual email processing:', error);
+        res.status(500).json({ error: 'Failed to process emails' });
       }
     });
   }
@@ -121,15 +140,24 @@ class InboxScoutAgent {
     console.log('Starting to process unread emails...');
 
     try {
-      // This would integrate with the MCP Outlook client
-      // For now, we'll simulate the process
-      console.log('Processing unread emails...');
-      
-      // TODO: Implement actual email fetching via MCP
-      // const unreadMessages = await outlookClient.getUnreadMessages();
-      // for (const message of unreadMessages) {
-      //   await this.processMessage(message.id);
-      // }
+      const unreadMessages = await this.outlookClient.getUnreadMessages();
+      console.log(`Found ${unreadMessages.length} unread emails`);
+
+      for (const message of unreadMessages) {
+        try {
+          console.log(`Processing email: ${message.subject} from ${message.from.emailAddress.address}`);
+          
+          const result = await this.processMessage(message.id);
+          
+          if (result) {
+            console.log(`✅ Processed email from ${message.from.emailAddress.address}`);
+            console.log(`   Draft ID: ${result.draftId}`);
+            console.log(`   Voice Score: ${result.voiceScore}`);
+          }
+        } catch (error) {
+          console.error(`Error processing email ${message.id}:`, error);
+        }
+      }
       
     } catch (error) {
       console.error('Error processing unread emails:', error);
@@ -138,281 +166,180 @@ class InboxScoutAgent {
     }
   }
 
-  async processMessage(messageId: string): Promise<DraftResult> {
+  async processMessage(messageId: string): Promise<DraftResult | null> {
     try {
       console.log(`Processing message: ${messageId}`);
 
-      // TODO: Integrate with MCP clients
       // 1. Get message from Outlook
-      // const message = await outlookClient.getMessage(messageId);
+      const message = await this.outlookClient.getMessage(messageId);
       
+      // Check if this message needs a reply
+      if (!this.shouldReplyToMessage(message)) {
+        console.log(`Skipping message ${messageId} - no reply needed`);
+        return null;
+      }
+
       // 2. Find or create contact in Notion
-      // const contact = await notionClient.findContact(message.from.emailAddress.address);
-      
+      const contact = await this.notionClient.findOrCreateContact({
+        email: message.from.emailAddress.address,
+        name: message.from.emailAddress.name || message.from.emailAddress.address,
+        lastInteraction: new Date().toISOString()
+      });
+
       // 3. Retrieve context from Pinecone
-      // const context = await this.memoryClient.retrieveContext(
-      //   message.body.content,
-      //   message.from.emailAddress.address
-      // );
-      
+      const context = await this.memoryClient.retrieveContext(
+        message.body,
+        message.from.emailAddress.address
+      );
+
       // 4. Generate draft reply
-      // const draftReply = await this.generateDraftReply(message, context);
+      const draftReply = await this.generateDraftReply(message, context);
       
       // 5. Create Outlook draft
-      // const draftId = await outlookClient.createReplyDraft(messageId);
-      // await outlookClient.updateDraft(draftId, undefined, draftReply.html);
-      // const webLink = await outlookClient.getMessageLink(draftId);
+      const draft = await this.outlookClient.createReplyDraft(messageId, draftReply.text);
       
       // 6. Save to Notion
-      // await notionClient.createDraft({
-      //   title: `Re: ${message.subject}`,
-      //   contactId: contact.id,
-      //   sourceMessageId: messageId,
-      //   proposedReply: draftReply.text,
-      //   outlookDraftId: draftId,
-      //   outlookWebLink: webLink,
-      //   priority: this.determinePriority(message),
-      //   emailType: this.classifyEmailType(message),
-      //   wordCount: draftReply.text.split(' ').length,
-      //   voiceScore: draftReply.voiceScore,
-      // });
-      
+      await this.notionClient.createDraft({
+        messageId: messageId,
+        subject: message.subject,
+        from: message.from.emailAddress.address,
+        draftText: draftReply.text,
+        voiceScore: draftReply.voiceScore,
+        status: 'pending_review',
+        createdAt: new Date().toISOString()
+      });
+
       // 7. Log interaction
-      // await notionClient.logInteraction({
-      //   title: `Email from ${contact.name}`,
-      //   contactId: contact.id,
-      //   sourceMessageId: messageId,
-      //   interactionType: 'Inbound',
-      //   subject: message.subject,
-      //   summary: this.generateSummary(message),
-      //   sentiment: this.analyzeSentiment(message),
-      //   actionRequired: this.requiresAction(message),
-      //   outcome: 'In Progress',
-      // });
-      
+      await this.notionClient.createInteraction({
+        messageId: messageId,
+        subject: message.subject,
+        from: message.from.emailAddress.address,
+        timestamp: new Date().toISOString(),
+        status: 'processed',
+        draftId: draft.id,
+        voiceScore: draftReply.voiceScore
+      });
+
       // 8. Index email content
-      // await this.memoryClient.indexEmail(messageId, message.body.content, {
-      //   contactEmail: message.from.emailAddress.address,
-      //   subject: message.subject,
-      //   receivedDateTime: message.receivedDateTime,
-      // });
+      await this.memoryClient.indexEmail(messageId, message.body, {
+        contactEmail: message.from.emailAddress.address,
+        subject: message.subject,
+        receivedDateTime: message.receivedDateTime,
+      });
 
-      // For now, return a mock result
       return {
-        draftId: `draft_${messageId}`,
-        webLink: `https://outlook.office.com/mail/deeplink/read/${messageId}`,
-        proposedReply: 'Thank you for your email. I will get back to you soon.',
-        voiceScore: 0.85,
+        draftId: draft.id,
+        webLink: draft.webLink,
+        proposedReply: draftReply.text,
+        voiceScore: draftReply.voiceScore
       };
-
+      
     } catch (error) {
       console.error(`Error processing message ${messageId}:`, error);
       throw error;
     }
   }
 
-  private async generateDraftReply(message: EmailMessage, context: any): Promise<{
-    text: string;
-    html: string;
-    voiceScore: number;
-  }> {
+  private shouldReplyToMessage(message: EmailMessage): boolean {
+    const subject = message.subject.toLowerCase();
+    const body = message.body.toLowerCase();
+
+    // Skip auto-replies, newsletters, etc.
+    const skipPatterns = [
+      'auto-reply', 'out of office', 'vacation', 'away',
+      'newsletter', 'unsubscribe', 'noreply', 'no-reply',
+      'delivery status notification', 'mail delivery system'
+    ];
+
+    return !skipPatterns.some(pattern => 
+      subject.includes(pattern) || body.includes(pattern)
+    );
+  }
+
+  private async generateDraftReply(message: EmailMessage, context: any): Promise<{ text: string; voiceScore: number }> {
     try {
-      // Get voice examples for context
-      const voiceExamples = await this.memoryClient.getVoiceExamples(
-        message.body,
-        'Greeting'
-      );
+      const prompt = `
+You are Amy, a business owner who runs an online business. Write a professional, friendly email reply.
 
-      // Build context for AI
-      const contextText = this.buildContextText(context, voiceExamples);
-      
-      const systemPrompt = `You are Amy's AI assistant writing email replies in her voice.
+Original email:
+Subject: ${message.subject}
+From: ${message.from.emailAddress.name} (${message.from.emailAddress.address})
+Body: ${message.body}
 
-VOICE TARGET (derived from LinkedIn + Sent edits):
-• Tone: warm, direct, confident; plain English; no emojis
-• Cadence: 2–4 short paragraphs; bullets OK; avoid walls of text
-• Signature moves: start with 1-sentence why, address one concern, give 1 clear next step
-• Phrases to favor: "Happy to…", "Two quick options…", "If helpful, I can…"
-• Phrases to avoid: "Per my last…", "Kindly…"
+Context from previous interactions:
+${context || 'No previous context available.'}
 
-Limits:
-• ≤180 words unless explicitly asked for detail
-• No facts without sources from context
-• Ask 1 clarifying question if missing info
+Write a reply that:
+1. Is professional but warm and friendly
+2. Matches Amy's voice and tone
+3. Addresses the sender's needs
+4. Is concise but complete
+5. Maintains business relationships
 
-${contextText}`;
+Reply:`;
 
       const completion = await this.openai.chat.completions.create({
         model: 'gpt-4',
         messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: message.body },
+          {
+            role: 'system',
+            content: 'You are Amy, a professional business owner who writes warm, friendly, and professional emails.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
         ],
-        max_tokens: 300,
-        temperature: 0.7,
+        max_tokens: 500,
+        temperature: 0.7
       });
 
-      const replyText = completion.choices[0]?.message?.content || '';
-      const htmlReply = this.convertToHtml(replyText);
+      const replyText = completion.choices[0]?.message?.content || 'Thank you for your email. I will get back to you soon.';
       
-      // Calculate voice score (simplified)
-      const voiceScore = this.calculateVoiceScore(replyText, voiceExamples);
+      // Simple voice scoring based on length and politeness
+      const voiceScore = this.calculateVoiceScore(replyText);
 
       return {
         text: replyText,
-        html: htmlReply,
-        voiceScore,
+        voiceScore
       };
-
     } catch (error) {
       console.error('Error generating draft reply:', error);
-      throw error;
+      return {
+        text: 'Thank you for your email. I will get back to you soon.',
+        voiceScore: 0.5
+      };
     }
   }
 
-  private buildContextText(context: any, voiceExamples: any[]): string {
-    let contextText = '';
-
-    if (context.notes.length > 0) {
-      contextText += '\nCONTACT NOTES:\n';
-      context.notes.forEach((note: any) => {
-        contextText += `- ${note.metadata.content}\n`;
-      });
-    }
-
-    if (context.kb.length > 0) {
-      contextText += '\nRELEVANT KNOWLEDGE:\n';
-      context.kb.forEach((kb: any) => {
-        contextText += `- ${kb.metadata.content}\n`;
-      });
-    }
-
-    if (context.emails.length > 0) {
-      contextText += '\nSIMILAR EMAILS:\n';
-      context.emails.forEach((email: any) => {
-        contextText += `- ${email.metadata.content}\n`;
-      });
-    }
-
-    if (voiceExamples.length > 0) {
-      contextText += '\nVOICE EXAMPLES:\n';
-      voiceExamples.forEach((example: any) => {
-        contextText += `- ${example.metadata.content}\n`;
-      });
-    }
-
-    return contextText;
-  }
-
-  private convertToHtml(text: string): string {
-    return text
-      .replace(/\n\n/g, '</p><p>')
-      .replace(/\n/g, '<br>')
-      .replace(/^/, '<p>')
-      .replace(/$/, '</p>');
-  }
-
-  private calculateVoiceScore(text: string, voiceExamples: any[]): number {
-    // Simplified voice scoring - in production, this would be more sophisticated
-    const amyPhrases = ['Happy to', 'Two quick options', 'If helpful'];
-    const avoidedPhrases = ['Per my last', 'Kindly'];
+  private calculateVoiceScore(text: string): number {
+    // Simple scoring based on text characteristics
+    const words = text.split(' ');
+    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
     
-    let score = 0.5; // Base score
+    // Base score
+    let score = 0.5;
     
-    // Check for preferred phrases
-    amyPhrases.forEach(phrase => {
-      if (text.includes(phrase)) score += 0.1;
-    });
+    // Length scoring (prefer medium length)
+    if (words.length >= 20 && words.length <= 100) score += 0.2;
+    if (words.length < 10) score -= 0.2;
     
-    // Check for avoided phrases
-    avoidedPhrases.forEach(phrase => {
-      if (text.includes(phrase)) score -= 0.2;
-    });
+    // Politeness indicators
+    const politeWords = ['thank', 'please', 'appreciate', 'grateful', 'wonderful', 'excellent'];
+    const politeCount = politeWords.filter(word => text.toLowerCase().includes(word)).length;
+    score += politeCount * 0.05;
     
-    // Check length (prefer shorter)
-    const wordCount = text.split(' ').length;
-    if (wordCount <= 180) score += 0.1;
+    // Professional tone indicators
+    const professionalWords = ['regarding', 'furthermore', 'however', 'therefore', 'additionally'];
+    const professionalCount = professionalWords.filter(word => text.toLowerCase().includes(word)).length;
+    score += professionalCount * 0.03;
     
     return Math.min(Math.max(score, 0), 1);
-  }
-
-  private determinePriority(message: EmailMessage): 'Low' | 'Medium' | 'High' | 'Urgent' {
-    const urgentKeywords = ['urgent', 'asap', 'immediately', 'emergency'];
-    const highKeywords = ['important', 'priority', 'deadline'];
-    
-    const content = `${message.subject} ${message.body}`.toLowerCase();
-    
-    if (urgentKeywords.some(keyword => content.includes(keyword))) {
-      return 'Urgent';
-    }
-    
-    if (highKeywords.some(keyword => content.includes(keyword))) {
-      return 'High';
-    }
-    
-    return 'Medium';
-  }
-
-  private classifyEmailType(message: EmailMessage): 'Inquiry' | 'Follow-up' | 'Support' | 'Sales' | 'Other' {
-    const content = `${message.subject} ${message.body}`.toLowerCase();
-    
-    if (content.includes('follow up') || content.includes('follow-up')) {
-      return 'Follow-up';
-    }
-    
-    if (content.includes('support') || content.includes('help') || content.includes('issue')) {
-      return 'Support';
-    }
-    
-    if (content.includes('purchase') || content.includes('buy') || content.includes('price')) {
-      return 'Sales';
-    }
-    
-    if (content.includes('question') || content.includes('?')) {
-      return 'Inquiry';
-    }
-    
-    return 'Other';
-  }
-
-  private generateSummary(message: EmailMessage): string {
-    // Simplified summary generation
-    const words = message.body.split(' ').slice(0, 20).join(' ');
-    return `Email about: ${message.subject}. ${words}...`;
-  }
-
-  private analyzeSentiment(message: EmailMessage): 'Positive' | 'Neutral' | 'Negative' | 'Urgent' {
-    const content = `${message.subject} ${message.body}`.toLowerCase();
-    
-    if (content.includes('urgent') || content.includes('emergency')) {
-      return 'Urgent';
-    }
-    
-    const negativeWords = ['problem', 'issue', 'complaint', 'disappointed', 'angry'];
-    const positiveWords = ['thank', 'great', 'excellent', 'happy', 'pleased'];
-    
-    if (negativeWords.some(word => content.includes(word))) {
-      return 'Negative';
-    }
-    
-    if (positiveWords.some(word => content.includes(word))) {
-      return 'Positive';
-    }
-    
-    return 'Neutral';
-  }
-
-  private requiresAction(message: EmailMessage): boolean {
-    const content = `${message.subject} ${message.body}`.toLowerCase();
-    const actionWords = ['please', 'can you', 'could you', 'need', 'require'];
-    
-    return actionWords.some(word => content.includes(word));
   }
 
   async start(port: number = 3000): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        // Bind to 0.0.0.0 for Railway deployment
         const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';
         
         this.app.listen(port, host, () => {
