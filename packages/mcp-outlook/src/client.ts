@@ -144,6 +144,17 @@ export class MCPOutlookClient {
 
   async createReplyDraft(messageId: string, replyText: string): Promise<DraftResult> {
     try {
+      console.log(`Creating reply draft for message: ${messageId}`);
+      
+      // First, let's check if the message exists and supports replies
+      const message = await this.getMessage(messageId);
+      console.log(`Message details:`, {
+        id: message.id,
+        subject: message.subject,
+        from: message.from?.emailAddress?.address,
+        conversationId: message.conversationId
+      });
+
       const draft = await this.makeGraphRequest(
         `/users/${process.env.CLIENT_EMAIL || 'amy@alignedtribe.com'}/messages/${messageId}/createReply`,
         {
@@ -165,7 +176,40 @@ export class MCPOutlookClient {
       };
     } catch (error) {
       console.error(`Error creating reply draft for ${messageId}:`, error);
-      throw error;
+      
+      // If reply creation fails, we can still create a regular draft
+      console.log('Attempting to create regular draft instead of reply...');
+      try {
+        const message = await this.getMessage(messageId);
+        const draft = await this.makeGraphRequest(
+          `/users/${process.env.CLIENT_EMAIL || 'amy@alignedtribe.com'}/messages`,
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              subject: `Re: ${message.subject}`,
+              body: {
+                contentType: 'HTML',
+                content: `<div>${replyText.replace(/\n/g, '<br>')}</div>`
+              },
+              toRecipients: [
+                {
+                  emailAddress: {
+                    address: message.from?.emailAddress?.address
+                  }
+                }
+              ]
+            })
+          }
+        );
+
+        return {
+          id: draft.id,
+          webLink: draft.webLink,
+        };
+      } catch (fallbackError) {
+        console.error('Fallback draft creation also failed:', fallbackError);
+        throw error; // Throw the original error
+      }
     }
   }
 
