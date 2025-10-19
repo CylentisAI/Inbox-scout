@@ -1,8 +1,8 @@
 # Use Node.js 18 LTS
 FROM node:18-alpine
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install pnpm and curl for health checks
+RUN npm install -g pnpm && apk add --no-cache curl
 
 # Set working directory
 WORKDIR /app

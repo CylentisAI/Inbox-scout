@@ -16,7 +16,7 @@
     "deploy": "pnpm run build && pnpm run --recursive deploy",
     "setup-client": "node scripts/setup-client.js",
     "ingest-linkedin": "node packages/ingest-linkedin/src/ingest.js",
-    "start": "node services/agent-service/dist/index.js"
+    "start": "pnpm run --parallel start"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
