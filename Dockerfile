@@ -1,20 +1,21 @@
 # Use Node.js 18 LTS
 FROM node:18-alpine
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install pnpm and build dependencies
+RUN npm install -g pnpm@8.15.0 && \
+    apk add --no-cache python3 make g++
 
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy package files first for better layer caching
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# Copy all workspace packages
+# Copy workspace packages and services
 COPY packages/ ./packages/
 COPY services/ ./services/
 
-# Install dependencies
+# Install all dependencies (including dev dependencies needed for build)
 RUN pnpm install --frozen-lockfile
 
 # Build the application
