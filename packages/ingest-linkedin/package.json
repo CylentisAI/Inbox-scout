@@ -13,7 +13,8 @@
   "dependencies": {
     "yauzl": "^2.10.0",
     "csv-parser": "^3.0.0",
-    "@inbox-scout/mcp-notion": "workspace:*"
+    "@inbox-scout/mcp-notion": "workspace:*",
+    "@inbox-scout/memory-pinecone": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

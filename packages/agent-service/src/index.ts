@@ -35,6 +35,7 @@ class InboxScoutAgent {
   private memoryClient: MemoryClient | null = null;
   private app: express.Application;
   private isProcessing: boolean = false;
+  private aiFilterCache: Map<string, boolean> = new Map();
 
   constructor() {
     // Check for required environment variables
@@ -179,7 +180,7 @@ class InboxScoutAgent {
       const message = await this.outlookClient.getMessage(messageId);
       
       // Check if this message needs a reply
-      if (!this.shouldReplyToMessage(message)) {
+      if (!(await this.shouldReplyToMessage(message))) {
         console.log(`Skipping message ${messageId} - no reply needed`);
         return null;
       }
@@ -203,8 +204,8 @@ class InboxScoutAgent {
             message.body
           );
           
-          // Get voice guidance
-          voiceGuidance = await this.memoryClient.getVoiceGuidance();
+          // Get voice guidance with email context for better semantic matching
+          voiceGuidance = await this.memoryClient.getVoiceGuidance(message.body);
           
           console.log(`📚 Retrieved context for ${message.from.emailAddress.address}`);
         } catch (error) {
@@ -270,20 +271,130 @@ class InboxScoutAgent {
     }
   }
 
-  private shouldReplyToMessage(message: EmailMessage): boolean {
+  private async shouldReplyToMessage(message: EmailMessage): Promise<boolean> {
+    // Rule-based filtering (first pass - fast, no API calls)
+    if (!this.passesRuleBasedFilter(message)) {
+      return false;
+    }
+
+    // AI-based filtering (second pass - only for emails passing rule-based check)
+    return this.shouldAmyReplyToEmail(message);
+  }
+
+  private passesRuleBasedFilter(message: EmailMessage): boolean {
+    const emailAddress = message.from.emailAddress.address.toLowerCase();
     const subject = message.subject.toLowerCase();
     const body = message.body.toLowerCase();
 
-    // Skip auto-replies, newsletters, etc.
-    const skipPatterns = [
-      'auto-reply', 'out of office', 'vacation', 'away',
-      'newsletter', 'unsubscribe', 'noreply', 'no-reply',
-      'delivery status notification', 'mail delivery system'
+    // Check sender email address for no-reply patterns
+    const noReplyPatterns = [
+      'noreply', 'no-reply', 'automated', 'donotreply', 
+      'mailer-daemon', 'postmaster', 'notification',
+      'no_reply', 'do-not-reply', 'do_not_reply',
+      'mailerdaemon', 'autoreply', 'auto-reply'
     ];
 
-    return !skipPatterns.some(pattern => 
+    const hasNoReplyPattern = noReplyPatterns.some(pattern => 
+      emailAddress.includes(pattern)
+    );
+
+    if (hasNoReplyPattern) {
+      console.log(`Skipping email from ${emailAddress} - no-reply pattern detected`);
+      return false;
+    }
+
+    // Check for common auto-reply indicators in subject/body
+    const autoReplyPatterns = [
+      'auto-reply', 'out of office', 'vacation', 'away',
+      'delivery status notification', 'mail delivery system',
+      'read receipt', 'delivery receipt', 'undeliverable',
+      'failure notice', 'bounce', 'failed delivery'
+    ];
+
+    const hasAutoReplyPattern = autoReplyPatterns.some(pattern => 
       subject.includes(pattern) || body.includes(pattern)
     );
+
+    if (hasAutoReplyPattern) {
+      console.log(`Skipping email - auto-reply pattern detected`);
+      return false;
+    }
+
+    // Check for bulk mailing patterns
+    const bulkMailingPatterns = [
+      'newsletter', 'unsubscribe', 'mailing list', 'marketing',
+      'promotional', 'special offer', 'limited time',
+      'view in browser', 'update preferences', 'manage subscription'
+    ];
+
+    const hasBulkMailingPattern = bulkMailingPatterns.some(pattern => 
+      subject.includes(pattern) || body.includes(pattern)
+    );
+
+    if (hasBulkMailingPattern) {
+      console.log(`Skipping email - bulk mailing pattern detected`);
+      return false;
+    }
+
+    return true;
+  }
+
+  private async shouldAmyReplyToEmail(message: EmailMessage): Promise<boolean> {
+    // Create a cache key based on email characteristics
+    const cacheKey = `${message.from.emailAddress.address}_${message.subject.substring(0, 50)}`;
+    
+    // Check cache first
+    if (this.aiFilterCache.has(cacheKey)) {
+      return this.aiFilterCache.get(cacheKey)!;
+    }
+
+    try {
+      const prompt = `Would Amy likely respond to this email? Consider:
+- Is it a real person asking something actionable?
+- Is it spam/automated?
+- Is it a personal or business request that requires a response?
+- Does it seem like a genuine inquiry that deserves a reply?
+
+Email Details:
+Subject: ${message.subject}
+From: ${message.from.emailAddress.name} (${message.from.emailAddress.address})
+Body (first 500 chars): ${message.body.substring(0, 500)}
+
+Respond with ONLY "YES" or "NO" - no explanation needed.`;
+
+      const completion = await this.openai.chat.completions.create({
+        model: process.env.OPENAI_MODEL || 'gpt-4',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an email filtering assistant. Respond with only YES or NO based on whether Amy would likely respond to this email.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        max_tokens: 10,
+        temperature: 0.3
+      });
+
+      const response = completion.choices[0]?.message?.content?.trim().toUpperCase() || 'NO';
+      const shouldReply = response.includes('YES');
+
+      // Cache the result (limit cache size to prevent memory issues)
+      if (this.aiFilterCache.size > 1000) {
+        // Remove oldest entries
+        const firstKey = this.aiFilterCache.keys().next().value;
+        this.aiFilterCache.delete(firstKey);
+      }
+      this.aiFilterCache.set(cacheKey, shouldReply);
+
+      return shouldReply;
+    } catch (error) {
+      console.error('Error in AI-based email filtering:', error);
+      // On error, default to true (allow through) to avoid blocking legitimate emails
+      return true;
+    }
   }
 
   private async generateDraftReply(message: EmailMessage, contextText: string, voiceGuidance: string): Promise<{ text: string; voiceScore: number }> {
@@ -302,20 +413,21 @@ ${voiceGuidance || ''}
 
 Write a reply that:
 1. Is professional but warm and friendly
-2. Matches Amy's voice and tone (use the voice profile above)
+2. Matches Amy's voice and tone EXACTLY - use the writing examples and style patterns provided above
 3. References past conversations when relevant
 4. Addresses the sender's needs directly
 5. Is concise but complete (≤180 words unless detail needed)
 6. Maintains business relationships
+7. Sounds natural and authentic, like Amy wrote it herself
 
 Reply:`;
 
       const completion = await this.openai.chat.completions.create({
-        model: 'gpt-4',
+        model: process.env.OPENAI_MODEL || 'gpt-4',
         messages: [
           {
             role: 'system',
-            content: 'You are Amy, a professional business owner who writes warm, friendly, and professional emails.'
+            content: 'You are Amy, a professional business owner who writes warm, friendly, and professional emails. Match Amy\'s voice and writing style exactly as shown in the examples provided.'
           },
           {
             role: 'user',

@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as yauzl from 'yauzl';
 import { createReadStream } from 'fs';
 import csv from 'csv-parser';
+import { MemoryClient } from '@inbox-scout/memory-pinecone';
 
 interface LinkedInContent {
   text: string;
@@ -35,8 +36,10 @@ interface VoiceProfile {
 
 class LinkedInIngester {
   private extractedContent: LinkedInContent[] = [];
+  private memoryClient: MemoryClient | null = null;
 
-  constructor() {
+  constructor(memoryClient?: MemoryClient) {
+    this.memoryClient = memoryClient || null;
   }
 
   async ingestLinkedInExport(zipPath: string): Promise<VoiceProfile> {
@@ -408,19 +411,41 @@ class LinkedInIngester {
 
   private async indexVoiceContent(): Promise<void> {
     try {
-      const voiceItems = this.extractedContent.map((content, index) => ({
-        id: `linkedin_${index}`,
+      if (!this.memoryClient) {
+        console.log('⚠️  MemoryClient not provided - skipping Pinecone indexing');
+        console.log(`Would index ${this.extractedContent.length} voice items`);
+        return;
+      }
+
+      console.log(`📚 Indexing ${this.extractedContent.length} LinkedIn content items to Pinecone...`);
+      
+      // Prepare posts for ingestion
+      const posts = this.extractedContent.map(content => ({
         text: content.text,
-        meta: {
-          date: content.date,
-          url: content.url,
-          kind: content.kind,
-          source: content.source,
-        },
+        date: content.date,
+        url: content.url,
+        kind: content.kind,
+        source: content.source
       }));
 
-      // await this.memoryClient.indexVoice(voiceItems);
-      console.log(`Content indexing placeholder for ${voiceItems.length} voice items`);
+      // Use MemoryClient's ingestLinkedInContent method
+      await this.memoryClient.ingestLinkedInContent(posts.map(p => ({
+        text: p.text,
+        date: p.date
+      })));
+
+      // Also store individual posts with rich metadata for better voice matching
+      for (let i = 0; i < this.extractedContent.length; i++) {
+        const content = this.extractedContent[i];
+        await this.memoryClient.storeVoicePattern({
+          pattern: content.text,
+          frequency: 1,
+          context: `LinkedIn ${content.kind} from ${content.source}`,
+          source: 'linkedin'
+        });
+      }
+
+      console.log(`✅ Successfully indexed ${this.extractedContent.length} LinkedIn content items to Pinecone`);
       
     } catch (error) {
       console.error('Error indexing voice content:', error);
@@ -452,27 +477,54 @@ class LinkedInIngester {
 
 // CLI interface
 async function main() {
-  const zipPath = process.argv[2];
+  const zipPaths = process.argv.slice(2);
   
-  if (!zipPath) {
-    console.error('Usage: npm run ingest <path-to-linkedin-export.zip>');
+  if (zipPaths.length === 0) {
+    console.error('Usage: npm run ingest <path-to-linkedin-export.zip> [additional-zip-files...]');
+    console.error('Example: npm run ingest export1.zip export2.zip');
     process.exit(1);
   }
-  
-  if (!fs.existsSync(zipPath)) {
-    console.error(`File not found: ${zipPath}`);
-    process.exit(1);
+
+  // Initialize MemoryClient if Pinecone credentials are available
+  let memoryClient: MemoryClient | null = null;
+  if (process.env.PINECONE_API_KEY && process.env.PINECONE_ENVIRONMENT && process.env.PINECONE_INDEX_NAME && process.env.OPENAI_API_KEY) {
+    console.log('🧠 Initializing MemoryClient with Pinecone...');
+    memoryClient = new MemoryClient(
+      process.env.PINECONE_API_KEY,
+      process.env.PINECONE_ENVIRONMENT,
+      process.env.PINECONE_INDEX_NAME,
+      process.env.OPENAI_API_KEY
+    );
+    console.log('✅ MemoryClient initialized');
+  } else {
+    console.log('⚠️  Pinecone credentials not found - content will not be stored to Pinecone');
+    console.log('   Set PINECONE_API_KEY, PINECONE_ENVIRONMENT, PINECONE_INDEX_NAME, and OPENAI_API_KEY to enable Pinecone storage');
   }
-  
+
   try {
-    const ingester = new LinkedInIngester();
-    const voiceProfile = await ingester.ingestLinkedInExport(zipPath);
+    const ingester = new LinkedInIngester(memoryClient || undefined);
     
-    console.log('\n=== Voice Profile Generated ===');
-    console.log(JSON.stringify(voiceProfile, null, 2));
+    // Process each zip file sequentially
+    for (let i = 0; i < zipPaths.length; i++) {
+      const zipPath = zipPaths[i];
+      
+      if (!fs.existsSync(zipPath)) {
+        console.error(`❌ File not found: ${zipPath}`);
+        continue;
+      }
+      
+      console.log(`\n📦 Processing file ${i + 1}/${zipPaths.length}: ${zipPath}`);
+      const voiceProfile = await ingester.ingestLinkedInExport(zipPath);
+      
+      console.log(`\n✅ Completed processing: ${zipPath}`);
+      console.log(`   Generated voice profile with ${Object.keys(voiceProfile.lexicon.commonOpeners).length} patterns`);
+    }
+    
+    console.log('\n🎉 LinkedIn ingestion completed successfully!');
+    console.log(`   Processed ${zipPaths.length} file(s)`);
     
   } catch (error) {
-    console.error('Ingestion failed:', error);
+    console.error('❌ Ingestion failed:', error);
     process.exit(1);
   }
 }

@@ -325,22 +325,78 @@ export class MemoryClient {
   }
 
   // Get voice guidance for draft generation
-  async getVoiceGuidance(): Promise<string> {
+  async getVoiceGuidance(emailContext?: string): Promise<string> {
     try {
+      const index = this.pinecone.index(this.indexName);
+      
+      // Search for relevant LinkedIn content based on email context
+      let relevantLinkedInContent: SearchResult[] = [];
+      
+      if (emailContext && emailContext.length > 0) {
+        // Use semantic search to find relevant LinkedIn posts
+        const emailEmbedding = await this.generateEmbedding(emailContext);
+        
+        const linkedInResults = await index.namespace('voice').query({
+          vector: emailEmbedding,
+          topK: 5,
+          includeMetadata: true,
+          filter: {
+            source: { $eq: 'linkedin' }
+          },
+        });
+
+        relevantLinkedInContent = linkedInResults.matches?.map((match) => ({
+          id: match.id,
+          score: match.score || 0,
+          metadata: match.metadata || {},
+          text: match.metadata?.pattern as string,
+        })) || [];
+      }
+      
+      // Also get general voice patterns
       const patterns = await this.getVoicePatterns(10);
       
-      if (patterns.length === 0) {
+      if (patterns.length === 0 && relevantLinkedInContent.length === 0) {
         return '';
       }
 
       let guidance = '\n\n## Amy\'s Voice Profile:\n';
-      guidance += 'Use these patterns and style elements:\n';
       
-      patterns.forEach((pattern, i) => {
-        if (pattern.text) {
-          guidance += `\n- ${pattern.text.substring(0, 100)}`;
-        }
-      });
+      // Add actual writing samples from LinkedIn that match the email context
+      if (relevantLinkedInContent.length > 0) {
+        guidance += '\n### Relevant Writing Style Examples:\n';
+        guidance += 'These examples match the tone and context of this email:\n\n';
+        
+        relevantLinkedInContent.slice(0, 3).forEach((sample, i) => {
+          if (sample.text && sample.text.length > 50) {
+            const truncated = sample.text.substring(0, 200);
+            guidance += `${i + 1}. "${truncated}${sample.text.length > 200 ? '...' : ''}"\n\n`;
+          }
+        });
+      }
+      
+      // Add general voice patterns
+      if (patterns.length > 0) {
+        guidance += '\n### Common Voice Patterns:\n';
+        guidance += 'Use these patterns and style elements:\n';
+        
+        patterns.forEach((pattern, i) => {
+          if (pattern.text && pattern.text.length > 0) {
+            // Show full pattern if it's short, otherwise truncate
+            const displayText = pattern.text.length > 150 
+              ? pattern.text.substring(0, 150) + '...' 
+              : pattern.text;
+            guidance += `\n- ${displayText}`;
+          }
+        });
+      }
+      
+      // Add style guidance based on LinkedIn content analysis
+      guidance += '\n\n### Writing Style Guidelines:\n';
+      guidance += '- Write in a warm, professional tone\n';
+      guidance += '- Be concise but complete\n';
+      guidance += '- Use natural, conversational language\n';
+      guidance += '- Match the tone and style of the examples above\n';
 
       return guidance;
     } catch (error) {
