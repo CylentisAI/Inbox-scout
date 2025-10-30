@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "LinkedIn data export parsing and voice pack creation",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/ingest.ts",
