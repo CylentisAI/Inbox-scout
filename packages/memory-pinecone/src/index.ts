@@ -47,17 +47,50 @@ export class MemoryClient {
   }
 
   private async generateEmbedding(text: string): Promise<number[]> {
-    try {
-      const response = await this.openai.embeddings.create({
-        model: 'text-embedding-3-small',
-        input: text,
-      });
+    const maxRetries = 3;
+    let retryCount = 0;
+    
+    while (retryCount < maxRetries) {
+      try {
+        const response = await this.openai.embeddings.create({
+          model: 'text-embedding-3-small',
+          input: text,
+        });
 
-      return response.data[0].embedding;
-    } catch (error) {
-      console.error('Error generating embedding:', error);
-      throw error;
+        return response.data[0].embedding;
+      } catch (error: any) {
+        // Handle quota errors - don't retry immediately, wait longer
+        if (error?.code === 'insufficient_quota' || error?.status === 429) {
+          console.error(`⚠️  OpenAI quota exceeded or rate limited. Waiting before retry...`);
+          
+          if (retryCount < maxRetries - 1) {
+            // Exponential backoff: wait longer each time (60s, 120s, 240s)
+            const waitTime = Math.pow(2, retryCount) * 60 * 1000;
+            console.log(`⏳ Waiting ${waitTime / 1000}s before retry ${retryCount + 1}/${maxRetries}...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            retryCount++;
+            continue;
+          } else {
+            // Final retry failed - throw error
+            console.error('❌ OpenAI quota/rate limit error after retries. Please check your OpenAI billing.');
+            throw error;
+          }
+        }
+        
+        // For other errors, retry with shorter backoff
+        if (retryCount < maxRetries - 1) {
+          const waitTime = (retryCount + 1) * 1000; // 1s, 2s, 3s
+          console.log(`⏳ Retrying embedding generation (${retryCount + 1}/${maxRetries}) after ${waitTime}ms...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          retryCount++;
+          continue;
+        }
+        
+        throw error;
+      }
     }
+    
+    throw new Error('Failed to generate embedding after retries');
   }
 
   // Store a conversation in memory
@@ -287,18 +320,59 @@ export class MemoryClient {
   async ingestLinkedInContent(posts: { text: string; date: string }[]): Promise<void> {
     try {
       console.log(`Ingesting ${posts.length} LinkedIn posts...`);
+      console.log(`⏳ Rate limiting: 100ms delay between posts to avoid quota issues`);
       
-      for (const post of posts) {
-        // Extract voice patterns from LinkedIn posts
-        await this.storeVoicePattern({
-          pattern: post.text,
-          frequency: 1,
-          context: 'LinkedIn post',
-          source: 'linkedin',
-        });
+      let successCount = 0;
+      let errorCount = 0;
+      
+      for (let i = 0; i < posts.length; i++) {
+        const post = posts[i];
+        
+        try {
+          // Extract voice patterns from LinkedIn posts
+          await this.storeVoicePattern({
+            pattern: post.text,
+            frequency: 1,
+            context: 'LinkedIn post',
+            source: 'linkedin',
+          });
+          
+          successCount++;
+          
+          // Rate limiting: small delay between posts to avoid hitting rate limits
+          if (i < posts.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+          
+          // Progress indicator every 50 posts
+          if ((i + 1) % 50 === 0) {
+            console.log(`  Progress: ${i + 1}/${posts.length} posts indexed (${successCount} success, ${errorCount} errors)`);
+          }
+        } catch (error: any) {
+          errorCount++;
+          
+          // If quota error, stop processing and log warning
+          if (error?.code === 'insufficient_quota' || error?.status === 429) {
+            console.error(`⚠️  Stopping ingestion due to OpenAI quota/rate limit error`);
+            console.error(`   Processed ${successCount} posts successfully before error`);
+            console.error(`   Remaining ${posts.length - i - 1} posts will be skipped`);
+            console.error(`   Please check your OpenAI billing and try again later`);
+            throw error;
+          }
+          
+          // For other errors, log but continue
+          console.error(`⚠️  Error indexing post ${i + 1}/${posts.length}:`, error.message);
+          
+          // Longer delay after error to avoid cascade failures
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
       }
 
-      console.log(`Ingested ${posts.length} LinkedIn posts successfully`);
+      console.log(`✅ Ingestion complete: ${successCount} posts indexed successfully, ${errorCount} errors`);
+      
+      if (errorCount > 0) {
+        console.log(`⚠️  Some posts failed to index. Check logs above for details.`);
+      }
     } catch (error) {
       console.error('Error ingesting LinkedIn content:', error);
       throw error;

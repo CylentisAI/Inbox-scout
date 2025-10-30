@@ -160,8 +160,22 @@ class InboxScoutAgent {
       console.log(`   Processed LinkedIn content and generated voice profile`);
       console.log(`   Voice patterns: ${Object.keys(voiceProfile.lexicon.commonOpeners).length} patterns identified`);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error during LinkedIn ingestion:', error);
+      
+      // If it's a quota error, log helpful message but don't crash the service
+      if (error?.code === 'insufficient_quota' || error?.status === 429) {
+        console.error('');
+        console.error('⚠️  LinkedIn ingestion failed due to OpenAI quota/rate limit');
+        console.error('   The service will continue running without LinkedIn voice data');
+        console.error('   Please check your OpenAI billing and try again later');
+        console.error('   The ingestion will retry automatically on next deployment');
+        console.error('');
+        return; // Don't throw - allow service to continue
+      }
+      
+      // For other errors, also allow service to continue
+      console.error('   Service will continue running without LinkedIn voice data');
       // Don't throw - allow service to continue running
     }
   }
