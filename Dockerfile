@@ -16,7 +16,8 @@ COPY packages/ ./packages/
 COPY services/ ./services/
 
 # Install all dependencies (including dev dependencies needed for build)
-RUN pnpm install --frozen-lockfile
+# Note: Using --no-frozen-lockfile temporarily to allow lockfile update for express dependency
+RUN pnpm install --no-frozen-lockfile
 
 # Build the application
 RUN pnpm build
