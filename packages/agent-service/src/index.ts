@@ -385,7 +385,9 @@ Respond with ONLY "YES" or "NO" - no explanation needed.`;
       if (this.aiFilterCache.size > 1000) {
         // Remove oldest entries
         const firstKey = this.aiFilterCache.keys().next().value;
-        this.aiFilterCache.delete(firstKey);
+        if (firstKey !== undefined) {
+          this.aiFilterCache.delete(firstKey);
+        }
       }
       this.aiFilterCache.set(cacheKey, shouldReply);
 
