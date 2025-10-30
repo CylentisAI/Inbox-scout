@@ -2,9 +2,12 @@ import express from 'express';
 import cors from 'cors';
 import cron from 'node-cron';
 import OpenAI from 'openai';
+import * as fs from 'fs';
+import * as path from 'path';
 import { MCPOutlookClient } from '@inbox-scout/mcp-outlook';
 import { MCPNotionClient } from '@inbox-scout/mcp-notion';
 import { MemoryClient } from '@inbox-scout/memory-pinecone';
+import { LinkedInIngester } from '@inbox-scout/ingest-linkedin';
 
 interface EmailMessage {
   id: string;
@@ -91,6 +94,12 @@ class InboxScoutAgent {
         process.env.OPENAI_API_KEY!
       );
       console.log('✅ Memory client initialized');
+      
+      // Automatically ingest LinkedIn data if not already ingested
+      this.initializeLinkedInData().catch(error => {
+        console.error('⚠️  Failed to initialize LinkedIn data:', error);
+        // Don't fail startup if LinkedIn ingestion fails
+      });
     } else {
       console.log('⚠️  Pinecone not configured - running without conversation memory');
     }
@@ -98,6 +107,63 @@ class InboxScoutAgent {
     this.app = express();
     this.setupExpress();
     this.setupCronJobs();
+  }
+
+  private async initializeLinkedInData(): Promise<void> {
+    if (!this.memoryClient) {
+      return;
+    }
+
+    try {
+      console.log('🔍 Checking if LinkedIn data has been ingested...');
+      
+      // Check if LinkedIn data already exists
+      const hasData = await this.memoryClient.hasLinkedInData();
+      
+      if (hasData) {
+        console.log('✅ LinkedIn data already ingested - skipping ingestion');
+        return;
+      }
+
+      console.log('📦 LinkedIn data not found - starting automatic ingestion...');
+      
+      // Look for LinkedIn export ZIP file
+      const possiblePaths = [
+        path.join(process.cwd(), 'linkedin-export.zip'),
+        path.join(process.cwd(), 'linkedin-export.zip.zip'),
+        path.join(process.cwd(), 'Complete_LinkedInDataExport_10-27-2025.zip.zip'),
+        path.join(process.cwd(), 'Complete_LinkedInDataExport_10-27-2025.zip'),
+      ];
+
+      let zipPath: string | null = null;
+      for (const possiblePath of possiblePaths) {
+        if (fs.existsSync(possiblePath)) {
+          zipPath = possiblePath;
+          console.log(`📁 Found LinkedIn export: ${zipPath}`);
+          break;
+        }
+      }
+
+      if (!zipPath) {
+        console.log('⚠️  LinkedIn export ZIP file not found - skipping ingestion');
+        console.log('   Expected location: linkedin-export.zip in project root');
+        return;
+      }
+
+      // Initialize LinkedIn ingester with memory client
+      const ingester = new LinkedInIngester(this.memoryClient);
+      
+      console.log(`🚀 Starting LinkedIn ingestion from ${zipPath}...`);
+      const voiceProfile = await ingester.ingestLinkedInExport(zipPath);
+      
+      console.log('🎉 LinkedIn ingestion completed successfully!');
+      console.log(`   Processed LinkedIn content and generated voice profile`);
+      console.log(`   Voice patterns: ${Object.keys(voiceProfile.lexicon.commonOpeners).length} patterns identified`);
+      
+    } catch (error) {
+      console.error('❌ Error during LinkedIn ingestion:', error);
+      // Don't throw - allow service to continue running
+    }
   }
 
   private setupExpress() {

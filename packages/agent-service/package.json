@@ -16,7 +16,8 @@
     "cors": "^2.8.0",
     "@inbox-scout/mcp-outlook": "workspace:*",
     "@inbox-scout/mcp-notion": "workspace:*",
-    "@inbox-scout/memory-pinecone": "workspace:*"
+    "@inbox-scout/memory-pinecone": "workspace:*",
+    "@inbox-scout/ingest-linkedin": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

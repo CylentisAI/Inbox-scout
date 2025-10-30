@@ -183,6 +183,30 @@ export class MemoryClient {
     }
   }
 
+  // Check if LinkedIn data has been ingested
+  async hasLinkedInData(): Promise<boolean> {
+    try {
+      const index = this.pinecone.index(this.indexName);
+      
+      // Try to query for LinkedIn voice patterns
+      const queryEmbedding = await this.generateEmbedding('linkedin post writing style');
+      
+      const results = await index.namespace('voice').query({
+        vector: queryEmbedding,
+        topK: 1,
+        includeMetadata: true,
+        filter: {
+          source: { $eq: 'linkedin' }
+        },
+      });
+
+      return (results.matches?.length || 0) > 0;
+    } catch (error) {
+      console.error('Error checking LinkedIn data:', error);
+      return false;
+    }
+  }
+
   // Get voice patterns for draft generation
   async getVoicePatterns(limit: number = 10): Promise<SearchResult[]> {
     try {

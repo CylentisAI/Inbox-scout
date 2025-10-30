@@ -25,6 +25,12 @@ RUN pnpm build
 # Copy startup script
 COPY start.js ./start.js
 
+# Copy LinkedIn export ZIP file for automatic ingestion
+# NOTE: This is only needed for first-time ingestion. After data is in Pinecone,
+# the service will skip ingestion automatically. You can remove this line and
+# the ZIP file from the repo after first successful deployment to reduce image size.
+COPY linkedin-export.zip ./linkedin-export.zip
+
 # Expose port (Railway will override with PORT env var)
 EXPOSE 3000
 

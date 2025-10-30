@@ -203,3 +203,5 @@ const digestService = new DigestService();
 const port = parseInt(process.env.DIGEST_SERVICE_PORT || '3001');
 
 digestService.start(port).catch(console.error);
+
+
