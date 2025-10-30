@@ -428,22 +428,11 @@ class LinkedInIngester {
         source: content.source
       }));
 
-      // Use MemoryClient's ingestLinkedInContent method
+      // Use MemoryClient's ingestLinkedInContent method (already stores with proper metadata)
       await this.memoryClient.ingestLinkedInContent(posts.map(p => ({
         text: p.text,
         date: p.date
       })));
-
-      // Also store individual posts with rich metadata for better voice matching
-      for (let i = 0; i < this.extractedContent.length; i++) {
-        const content = this.extractedContent[i];
-        await this.memoryClient.storeVoicePattern({
-          pattern: content.text,
-          frequency: 1,
-          context: `LinkedIn ${content.kind} from ${content.source}`,
-          source: 'linkedin'
-        });
-      }
 
       console.log(`✅ Successfully indexed ${this.extractedContent.length} LinkedIn content items to Pinecone`);
       
